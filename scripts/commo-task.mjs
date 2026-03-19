@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 import crypto from "node:crypto";
 
+const ACTIONS = {
+  create_task: "oc_create_task",
+  update_task: "oc_update_task",
+  get_task: "oc_get_task",
+  search_tasks: "oc_search_tasks",
+  archive_task: "oc_archive_task"
+};
+
 function resolveEnvConfig() {
   const env = (process.env.COMMO_ENV || "dev").toLowerCase();
   if (!["dev", "prod"].includes(env)) {
@@ -29,16 +37,6 @@ function resolveEnvConfig() {
   return { env, ...config };
 }
 
-const { env: ACTIVE_ENV, workflowRoot: WORKFLOW_ROOT, token: TOKEN } = resolveEnvConfig();
-
-const ACTIONS = {
-  create_task: "oc_create_task",
-  update_task: "oc_update_task",
-  get_task: "oc_get_task",
-  search_tasks: "oc_search_tasks",
-  archive_task: "oc_archive_task"
-};
-
 function usage() {
   console.log(`Usage:\n  COMMO_ENV=dev node scripts/commo-task.mjs <action> '<json-payload>'\n\nActions:\n  ${Object.keys(ACTIONS).join("\n  ")}\n  seed_tasks`);
 }
@@ -52,31 +50,31 @@ function validate(action, data) {
   }
 }
 
-function body(action, data) {
+function body(action, data, activeEnv) {
   return {
     request_id: crypto.randomUUID(),
     action,
     actor: "openclaw",
     ts: Math.floor(Date.now() / 1000),
-    env: ACTIVE_ENV,
+    env: activeEnv,
     ...data
   };
 }
 
-async function call(action, payload) {
+async function call(action, payload, config) {
   const endpoint = ACTIONS[action];
-  const res = await fetch(`${WORKFLOW_ROOT}/${endpoint}`, {
+  const res = await fetch(`${config.workflowRoot}/${endpoint}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${TOKEN}`
+      "Authorization": `Bearer ${config.token}`
     },
-    body: JSON.stringify(body(action, payload))
+    body: JSON.stringify(body(action, payload, config.env))
   });
   const text = await res.text();
   let json;
   try { json = JSON.parse(text); } catch { json = { raw: text }; }
-  return { ok: res.ok, status: res.status, environment: ACTIVE_ENV, response: json };
+  return { ok: res.ok, status: res.status, environment: config.env, response: json };
 }
 
 function randomTask() {
@@ -91,24 +89,26 @@ function randomTask() {
   };
 }
 
-async function seedTasks(count = 10) {
+async function seedTasks(count, config) {
   const results = [];
   for (let i = 0; i < count; i++) {
-    const r = await call("create_task", randomTask());
+    const r = await call("create_task", randomTask(), config);
     results.push(r);
   }
   return results;
 }
 
 async function main() {
+  const config = resolveEnvConfig();
+
   const [, , action, payloadRaw] = process.argv;
   if (!action) return usage();
 
   if (action === "seed_tasks") {
     const payload = payloadRaw ? JSON.parse(payloadRaw) : {};
     const count = Number(payload.count || 10);
-    const seeded = await seedTasks(count);
-    console.log(JSON.stringify({ ok: true, environment: ACTIVE_ENV, count, seeded }, null, 2));
+    const seeded = await seedTasks(count, config);
+    console.log(JSON.stringify({ ok: true, environment: config.env, count, seeded }, null, 2));
     return;
   }
 
@@ -120,7 +120,7 @@ async function main() {
   }
 
   validate(action, payload);
-  const result = await call(action, payload);
+  const result = await call(action, payload, config);
   console.log(JSON.stringify(result, null, 2));
   process.exit(result.ok ? 0 : 1);
 }
