@@ -1,12 +1,23 @@
 # Commo Task API Reference
 
-## Base URL
+## Environment Variables
 
-- Workflow API root: `https://app.commocommunities.com/version-test/api/1.1/wf`
+- `COMMO_ENV`: `dev` or `prod`
+- `COMMO_DEV_WORKFLOW_ROOT`: Dev workflow API root
+- `COMMO_DEV_API_TOKEN`: Dev bearer token
+- `COMMO_PROD_WORKFLOW_ROOT`: Prod workflow API root
+- `COMMO_PROD_API_TOKEN`: Prod bearer token
 
-## Auth
+No fallback or hardcoded default URL is used.
 
-- Header: `Authorization: Bearer <COMMO_API_TOKEN>`
+## Base URL (resolved by mode)
+
+- If `COMMO_ENV=dev` -> `COMMO_DEV_WORKFLOW_ROOT`
+- If `COMMO_ENV=prod` -> `COMMO_PROD_WORKFLOW_ROOT`
+
+## Auth (resolved by mode)
+
+- Header: `Authorization: Bearer <mode-specific token>`
 
 ## Endpoints
 

@@ -1,13 +1,35 @@
 #!/usr/bin/env node
 import crypto from "node:crypto";
 
-const WORKFLOW_ROOT = process.env.COMMO_WORKFLOW_ROOT || "https://app.commocommunities.com/version-test/api/1.1/wf";
-const TOKEN = process.env.COMMO_API_TOKEN;
+function resolveEnvConfig() {
+  const env = (process.env.COMMO_ENV || "dev").toLowerCase();
+  if (!["dev", "prod"].includes(env)) {
+    throw new Error("COMMO_ENV must be either 'dev' or 'prod'");
+  }
 
-if (!TOKEN) {
-  console.error(JSON.stringify({ ok: false, error: "Missing COMMO_API_TOKEN" }, null, 2));
-  process.exit(1);
+  const byMode = {
+    dev: {
+      workflowRoot: process.env.COMMO_DEV_WORKFLOW_ROOT,
+      token: process.env.COMMO_DEV_API_TOKEN
+    },
+    prod: {
+      workflowRoot: process.env.COMMO_PROD_WORKFLOW_ROOT,
+      token: process.env.COMMO_PROD_API_TOKEN
+    }
+  };
+
+  const config = byMode[env];
+  if (!config.workflowRoot) {
+    throw new Error(`Missing ${env === "dev" ? "COMMO_DEV_WORKFLOW_ROOT" : "COMMO_PROD_WORKFLOW_ROOT"}`);
+  }
+  if (!config.token) {
+    throw new Error(`Missing ${env === "dev" ? "COMMO_DEV_API_TOKEN" : "COMMO_PROD_API_TOKEN"}`);
+  }
+
+  return { env, ...config };
 }
+
+const { env: ACTIVE_ENV, workflowRoot: WORKFLOW_ROOT, token: TOKEN } = resolveEnvConfig();
 
 const ACTIONS = {
   create_task: "oc_create_task",
@@ -18,7 +40,7 @@ const ACTIONS = {
 };
 
 function usage() {
-  console.log(`Usage:\n  node scripts/commo-task.mjs <action> '<json-payload>'\n\nActions:\n  ${Object.keys(ACTIONS).join("\n  ")}\n  seed_tasks`);
+  console.log(`Usage:\n  COMMO_ENV=dev node scripts/commo-task.mjs <action> '<json-payload>'\n\nActions:\n  ${Object.keys(ACTIONS).join("\n  ")}\n  seed_tasks`);
 }
 
 function validate(action, data) {
@@ -36,6 +58,7 @@ function body(action, data) {
     action,
     actor: "openclaw",
     ts: Math.floor(Date.now() / 1000),
+    env: ACTIVE_ENV,
     ...data
   };
 }
@@ -53,7 +76,7 @@ async function call(action, payload) {
   const text = await res.text();
   let json;
   try { json = JSON.parse(text); } catch { json = { raw: text }; }
-  return { ok: res.ok, status: res.status, response: json };
+  return { ok: res.ok, status: res.status, environment: ACTIVE_ENV, response: json };
 }
 
 function randomTask() {
@@ -85,7 +108,7 @@ async function main() {
     const payload = payloadRaw ? JSON.parse(payloadRaw) : {};
     const count = Number(payload.count || 10);
     const seeded = await seedTasks(count);
-    console.log(JSON.stringify({ ok: true, count, seeded }, null, 2));
+    console.log(JSON.stringify({ ok: true, environment: ACTIVE_ENV, count, seeded }, null, 2));
     return;
   }
 

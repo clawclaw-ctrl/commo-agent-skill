@@ -9,11 +9,21 @@ Use this skill to perform task operations in the Commo service via authenticated
 
 ## Quick Start
 
-1. Ensure env vars exist:
-   - `COMMO_API_TOKEN`
-   - `COMMO_WORKFLOW_ROOT` (default: `https://app.commocommunities.com/version-test/api/1.1/wf`)
-2. Run the tool script:
+1. Set environment mode:
+   - `COMMO_ENV=dev` or `COMMO_ENV=prod`
+2. Configure both environments (recommended):
+   - `COMMO_DEV_WORKFLOW_ROOT`
+   - `COMMO_DEV_API_TOKEN`
+   - `COMMO_PROD_WORKFLOW_ROOT`
+   - `COMMO_PROD_API_TOKEN`
+3. Run the tool script:
    - `node scripts/commo-task.mjs create_task '{"title":"Example"}'`
+
+## Environment Selection
+
+- `COMMO_ENV=dev` uses `COMMO_DEV_WORKFLOW_ROOT` + `COMMO_DEV_API_TOKEN`
+- `COMMO_ENV=prod` uses `COMMO_PROD_WORKFLOW_ROOT` + `COMMO_PROD_API_TOKEN`
+- No default URL is embedded in the script; environment variables are required.
 
 ## Supported Actions
 
@@ -27,15 +37,16 @@ Use this skill to perform task operations in the Commo service via authenticated
 ## Workflow
 
 1. Validate required fields for the selected action.
-2. Send POST request to `${COMMO_WORKFLOW_ROOT}/{endpoint}`.
-3. Include bearer token header: `Authorization: Bearer ...`.
-4. Normalize output and surface `ok`, `status`, and `response`.
+2. Resolve active environment config from `COMMO_ENV`.
+3. Send POST request to `${WORKFLOW_ROOT}/{endpoint}`.
+4. Include bearer token header: `Authorization: Bearer ...`.
+5. Normalize output and surface `ok`, `status`, and `response`.
 
 ## Notes
 
 - Prefer `archive_task` over hard delete.
 - Keep status values consistent (`open`, `in_progress`, `done`, `archived`).
-- Use `version-test` for validation; move to live root only after verification.
+- Use `dev` for validation and `prod` only after verification.
 
 ## References
 
